@@ -27,18 +27,20 @@ jobs:
       - name: Generate Android Platform Files
         run: flutter create . --platforms=android --org=com.example
 
-      - name: Configure Android SDK & Subprojects to compileSdk 34
+      - name: Configure Android SDK & Subprojects to compileSdk 35
         run: |
           python3 -c "
           import os
 
-          # 1. Update android/app/build.gradle.kts or build.gradle
+          # 1. Update android/app/build.gradle.kts or build.gradle to 35
           for p in ['android/app/build.gradle.kts', 'android/app/build.gradle']:
               if os.path.exists(p):
                   with open(p, 'r', encoding='utf-8') as f:
                       c = f.read()
-                  c = c.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 34')
-                  c = c.replace('compileSdkVersion flutter.compileSdkVersion', 'compileSdkVersion 34')
+                  c = c.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 35')
+                  c = c.replace('compileSdk = 34', 'compileSdk = 35')
+                  c = c.replace('compileSdkVersion flutter.compileSdkVersion', 'compileSdkVersion 35')
+                  c = c.replace('compileSdkVersion 34', 'compileSdkVersion 35')
                   with open(p, 'w', encoding='utf-8') as f:
                       f.write(c)
                   print('Updated:', p)
@@ -52,7 +54,7 @@ jobs:
                           configurations.all {
                               resolutionStrategy.eachDependency {
                                   if (requested.group == \"androidx.annotation\" && requested.name == \"annotation-experimental\") {
-                                      useVersion(\"1.3.0\")
+                                      useVersion(\"1.4.1\")
                                   }
                               }
                           }
@@ -64,7 +66,7 @@ jobs:
                           configurations.all {
                               resolutionStrategy.eachDependency { details ->
                                   if (details.requested.group == 'androidx.annotation' && details.requested.name == 'annotation-experimental') {
-                                      details.useVersion '1.3.0'
+                                      details.useVersion '1.4.1'
                                   }
                               }
                           }
