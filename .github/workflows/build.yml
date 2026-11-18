@@ -47,7 +47,26 @@ jobs:
                       f.write(c)
                   print('Updated:', p)
 
-          # 2. Inject Android Permissions & Leanback into Manifest
+          # 2. Append subprojects block to android/build.gradle.kts
+          root_p = 'android/build.gradle.kts'
+          if os.path.exists(root_p):
+              subprojects_block = r'''
+subprojects {
+    plugins.withId("com.android.library") {
+        extensions.configure<com.android.build.gradle.LibraryExtension> {
+            compileSdk = 36
+        }
+    }
+    tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+        enabled = false
+    }
+}
+'''
+              with open(root_p, 'a', encoding='utf-8') as f:
+                  f.write('\n' + subprojects_block + '\n')
+              print('Appended Kotlin DSL block to:', root_p)
+
+          # 3. Inject Android Permissions & Leanback into Manifest
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
               with open(manifest_path, 'r', encoding='utf-8') as f:
