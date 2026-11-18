@@ -27,9 +27,34 @@ jobs:
       - name: Generate Android Platform Files
         run: flutter create . --platforms=android --org=com.example
 
-      - name: Inject Android Permissions & Leanback into Manifest
+      - name: Configure Android SDK & Subprojects to compileSdk 34
         run: |
           python3 -c "
+          # 1. Update android/app/build.gradle
+          app_gradle = 'android/app/build.gradle'
+          with open(app_gradle, 'r', encoding='utf-8') as f:
+              c = f.read()
+          c = c.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 34')
+          with open(app_gradle, 'w', encoding='utf-8') as f:
+              f.write(c)
+
+          # 2. Force all subprojects (including bonsoir_android) to compileSdk 34
+          root_gradle = 'android/build.gradle'
+          override = '''
+          subprojects {
+              afterEvaluate { project ->
+                  if (project.hasProperty('android')) {
+                      project.android {
+                          compileSdkVersion 34
+                      }
+                  }
+              }
+          }
+          '''
+          with open(root_gradle, 'a', encoding='utf-8') as f:
+              f.write('\n' + override + '\n')
+
+          # 3. Inject Android Permissions & Leanback into Manifest
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           with open(manifest_path, 'r', encoding='utf-8') as f:
               content = f.read()
@@ -54,7 +79,7 @@ jobs:
           content = content.replace('<application', permissions + '\n    <application')
           with open(manifest_path, 'w', encoding='utf-8') as f:
               f.write(content)
-          print('Manifest permissions injected successfully.')
+          print('Android SDK 34 and permissions configured successfully.')
           "
 
       - name: Install Dependencies
@@ -68,33 +93,3 @@ jobs:
         with:
           name: p2p-file-pool-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-
-  build-windows:
-    name: Build Windows Release
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-
-      - name: Enable Windows Desktop
-        run: flutter config --enable-windows-desktop
-
-      - name: Generate Windows Platform Files
-        run: flutter create . --platforms=windows --org=com.example
-
-      - name: Install Dependencies
-        run: flutter pub get
-
-      - name: Build Windows
-        run: flutter build windows --release
-
-      - name: Upload Windows Executable & Bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: p2p-file-pool-windows
-          path: build/windows/x64/runner/Release/
