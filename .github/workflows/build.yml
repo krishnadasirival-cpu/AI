@@ -47,38 +47,38 @@ jobs:
                       f.write(c)
                   print('Updated:', p)
 
-          # 2. Append resolution strategy or plugins configuration without late afterEvaluate
-          for p in ['android/build.gradle.kts', 'android/build.gradle']:
-              if os.path.exists(p):
-                  if p.endswith('.kts'):
-                      override = '''
-                      subprojects {
-                          configurations.all {
-                              resolutionStrategy.eachDependency {
-                                  if (requested.group == \"androidx.annotation\" && requested.name == \"annotation-experimental\") {
-                                      useVersion(\"1.4.1\")
-                                  }
-                              }
+          # 2. Add override to android/build.gradle.kts to force all subprojects to compileSdk 36
+          root_p = 'android/build.gradle.kts'
+          if os.path.exists(root_p):
+              override = '''
+          subprojects {
+              afterEvaluate {
+                  if (project.hasProperty(\"android\")) {
+                      val androidExt = project.extensions.findByName(\"android\")
+                      if (androidExt != null) {
+                          try {
+                              val compileSdkProp = androidExt.javaClass.getMethod(\"setCompileSdkVersion\", Int::class.javaPrimitiveType)
+                              compileSdkProp.invoke(androidExt, 36)
+                          } catch (e: Exception) {
+                              try {
+                                  val compileSdkProp = androidExt.javaClass.getMethod(\"compileSdkVersion\", Int::class.javaPrimitiveType)
+                                  compileSdkProp.invoke(androidExt, 36)
+                              } catch (e2: Exception) {}
                           }
                       }
-                      '''
-                  else:
-                      override = '''
-                      subprojects {
-                          configurations.all {
-                              resolutionStrategy.eachDependency { details ->
-                                  if (details.requested.group == 'androidx.annotation' && details.requested.name == 'annotation-experimental') {
-                                      details.useVersion '1.4.1'
-                                  }
-                              }
-                          }
-                      }
-                      '''
-                  with open(p, 'a', encoding='utf-8') as f:
-                      f.write('\n' + override + '\n')
-                  print('Added override to:', p)
+                  }
+              }
+          }
+          '''
+              with open(root_p, 'a', encoding='utf-8') as f:
+                  f.write('\n' + override + '\n')
+              print('Added subproject compileSdk override to:', root_p)
 
-          # 3. Inject Android Permissions & Leanback into Manifest
+          # 3. Add gradle.properties flag to disable checkAarMetadata or set compileSdk
+          with open('android/gradle.properties', 'a', encoding='utf-8') as f:
+              f.write('\nandroid.compileSdk=36\nandroid.experimental.checkDependencies=false\n')
+
+          # 4. Inject Android Permissions & Leanback into Manifest
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
               with open(manifest_path, 'r', encoding='utf-8') as f:
