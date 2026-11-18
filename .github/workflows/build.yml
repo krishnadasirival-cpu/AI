@@ -24,8 +24,38 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Recreate Android Platform Files
+      - name: Generate Android Platform Files
         run: flutter create . --platforms=android --org=com.example
+
+      - name: Inject Android Permissions & Leanback into Manifest
+        run: |
+          python3 -c "
+          manifest_path = 'android/app/src/main/AndroidManifest.xml'
+          with open(manifest_path, 'r', encoding='utf-8') as f:
+              content = f.read()
+
+          permissions = '''
+              <uses-permission android:name=\"android.permission.INTERNET\" />
+              <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />
+              <uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\" />
+              <uses-permission android:name=\"android.permission.CHANGE_WIFI_MULTICAST_STATE\" />
+              <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />
+              <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />
+              <uses-permission android:name=\"android.permission.MANAGE_EXTERNAL_STORAGE\" />
+              <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />
+              <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_DATA_SYNC\" />
+              <uses-permission android:name=\"android.permission.WAKE_LOCK\" />
+              <uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\" />
+              <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />
+              <uses-feature android:name=\"android.software.leanback\" android:required=\"false\" />
+              <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />
+              <uses-feature android:name=\"android.hardware.wifi\" android:required=\"false\" />
+          '''
+          content = content.replace('<application', permissions + '\n    <application')
+          with open(manifest_path, 'w', encoding='utf-8') as f:
+              f.write(content)
+          print('Manifest permissions injected successfully.')
+          "
 
       - name: Install Dependencies
         run: flutter pub get
@@ -54,7 +84,7 @@ jobs:
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
-      - name: Recreate Windows Platform Files
+      - name: Generate Windows Platform Files
         run: flutter create . --platforms=windows --org=com.example
 
       - name: Install Dependencies
