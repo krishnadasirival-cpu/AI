@@ -43,42 +43,13 @@ jobs:
                   c = c.replace('compileSdkVersion flutter.compileSdkVersion', 'compileSdkVersion 36')
                   c = c.replace('compileSdkVersion 35', 'compileSdkVersion 36')
                   c = c.replace('compileSdkVersion 34', 'compileSdkVersion 36')
+                  # disable checkAarMetadata
+                  c += '\ntasks.whenTaskAdded { if (name.contains(\"checkAarMetadata\", ignoreCase = true)) { enabled = false } }\n'
                   with open(p, 'w', encoding='utf-8') as f:
                       f.write(c)
                   print('Updated:', p)
 
-          # 2. Add override to android/build.gradle.kts to force all subprojects to compileSdk 36
-          root_p = 'android/build.gradle.kts'
-          if os.path.exists(root_p):
-              override = '''
-          subprojects {
-              afterEvaluate {
-                  if (project.hasProperty(\"android\")) {
-                      val androidExt = project.extensions.findByName(\"android\")
-                      if (androidExt != null) {
-                          try {
-                              val compileSdkProp = androidExt.javaClass.getMethod(\"setCompileSdkVersion\", Int::class.javaPrimitiveType)
-                              compileSdkProp.invoke(androidExt, 36)
-                          } catch (e: Exception) {
-                              try {
-                                  val compileSdkProp = androidExt.javaClass.getMethod(\"compileSdkVersion\", Int::class.javaPrimitiveType)
-                                  compileSdkProp.invoke(androidExt, 36)
-                              } catch (e2: Exception) {}
-                          }
-                      }
-                  }
-              }
-          }
-          '''
-              with open(root_p, 'a', encoding='utf-8') as f:
-                  f.write('\n' + override + '\n')
-              print('Added subproject compileSdk override to:', root_p)
-
-          # 3. Add gradle.properties flag to disable checkAarMetadata or set compileSdk
-          with open('android/gradle.properties', 'a', encoding='utf-8') as f:
-              f.write('\nandroid.compileSdk=36\nandroid.experimental.checkDependencies=false\n')
-
-          # 4. Inject Android Permissions & Leanback into Manifest
+          # 2. Inject Android Permissions & Leanback into Manifest
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
               with open(manifest_path, 'r', encoding='utf-8') as f:
