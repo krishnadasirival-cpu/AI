@@ -52,7 +52,7 @@ jobs:
           init_script = '''
           allprojects {
               tasks.whenTaskAdded { task ->
-                  if (task.name.contains('checkAarMetadata', true)) {
+                  if (task.name.toLowerCase().contains('checkaarmetadata')) {
                       task.enabled = false
                   }
               }
