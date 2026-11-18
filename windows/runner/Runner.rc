@@ -1,0 +1,11 @@
+#include "resource.h"
+#include "windows.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+#define _AFX_NO_SPLITTER_RESOURCES
+#define _AFX_NO_OLE_RESOURCES
+#define _AFX_NO_TRACKER_RESOURCES
+#define _AFX_NO_PROPERTY_RESOURCES
+#undef APSTUDIO_READONLY_SYMBOLS
+
+IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
