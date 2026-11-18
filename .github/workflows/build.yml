@@ -50,7 +50,7 @@ jobs:
           # 2. Append subprojects block to android/build.gradle.kts
           root_p = 'android/build.gradle.kts'
           if os.path.exists(root_p):
-              subprojects_block = '\nsubprojects {\n    plugins.withId("com.android.library") {\n        extensions.configure<com.android.build.gradle.LibraryExtension> {\n            compileSdk = 36\n        }\n    }\n    tasks.matching { it.name.contains("AarMetadata") }.configureEach {\n        enabled = false\n    }\n}\n'
+              subprojects_block = '\nsubprojects {\n    tasks.matching { it.name == "checkDebugAarMetadata" || it.name == "checkReleaseAarMetadata" }.configureEach {\n        enabled = false\n    }\n}\n'
               with open(root_p, 'a', encoding='utf-8') as f:
                   f.write(subprojects_block)
               print('Appended Kotlin DSL block to:', root_p)

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:bonsoir/bonsoir.dart';
 import '../../core/pool_contract.dart';
 
 class DiscoveredPeer {
@@ -31,17 +30,15 @@ class DiscoveredPeer {
 }
 
 class PoolDiscoveryService {
-  static const String serviceType = '_p2p-pool._tcp';
   static const int udpBroadcastPort = 45455;
 
   final DeviceNode localNode;
   final _peersController = StreamController<List<DiscoveredPeer>>.broadcast();
   final Map<String, DiscoveredPeer> _peers = {};
 
-  BonsoirBroadcast? _broadcast;
-  BonsoirDiscovery? _discovery;
   RawDatagramSocket? _udpSocket;
   Timer? _udpBeaconTimer;
+  Timer? _subnetSweepTimer;
   Timer? _peerPruneTimer;
 
   PoolDiscoveryService({required this.localNode});
@@ -50,9 +47,8 @@ class PoolDiscoveryService {
   List<DiscoveredPeer> get currentPeers => _peers.values.toList();
 
   Future<void> start() async {
-    await _startMdnsBroadcast();
-    await _startMdnsDiscovery();
-    await _startUdpFallback();
+    await _startUdpDiscovery();
+    _startPeriodicSubnetSweep();
 
     // Prune stale peers every 10 seconds
     _peerPruneTimer = Timer.periodic(const Duration(seconds: 10), (_) {
@@ -67,63 +63,7 @@ class PoolDiscoveryService {
     });
   }
 
-  Future<void> _startMdnsBroadcast() async {
-    try {
-      final service = BonsoirService(
-        name: localNode.name,
-        type: serviceType,
-        port: defaultLanPort,
-        attributes: {
-          'id': localNode.id,
-          'platform': localNode.platformType.name,
-        },
-      );
-
-      _broadcast = BonsoirBroadcast(service: service);
-      await _broadcast!.ready;
-      await _broadcast!.start();
-    } catch (_) {
-      // If mDNS broadcast is blocked or unsupported, UDP fallback guarantees discovery
-    }
-  }
-
-  Future<void> _startMdnsDiscovery() async {
-    try {
-      _discovery = BonsoirDiscovery(type: serviceType);
-      await _discovery!.ready;
-
-      _discovery!.eventStream?.listen((event) {
-        if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved &&
-            event.service != null) {
-          final service = event.service!;
-          final id = service.attributes['id'] ?? service.name;
-          if (id == localNode.id) return; // Ignore self
-
-          String ip = '';
-          if (service is ResolvedBonsoirService) {
-            ip = service.host ?? '';
-          }
-          if (ip.isEmpty) return;
-
-          final platformStr = service.attributes['platform'] ?? 'phone';
-          _addOrUpdatePeer(
-            DiscoveredPeer(
-              id: id,
-              name: service.name,
-              platformType: PlatformType.fromJson(platformStr),
-              ip: ip,
-              port: service.port,
-              lastSeen: DateTime.now(),
-            ),
-          );
-        }
-      });
-
-      await _discovery!.start();
-    } catch (_) {}
-  }
-
-  Future<void> _startUdpFallback() async {
+  Future<void> _startUdpDiscovery() async {
     try {
       _udpSocket = await RawDatagramSocket.bind(
         InternetAddress.anyIPv4,
@@ -187,6 +127,77 @@ class PoolDiscoveryService {
     } catch (_) {}
   }
 
+  void _startPeriodicSubnetSweep() {
+    // Run an initial sweep and repeat every 30 seconds
+    sweepSubnet();
+    _subnetSweepTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      sweepSubnet();
+    });
+  }
+
+  Future<void> sweepSubnet() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLinkLocal: false,
+      );
+
+      for (final interface in interfaces) {
+        for (final addr in interface.addresses) {
+          if (addr.isLoopback) continue;
+          final parts = addr.address.split('.');
+          if (parts.length != 4) continue;
+          final subnetPrefix = '${parts[0]}.${parts[1]}.${parts[2]}';
+
+          // Concurrently ping /24 hosts on defaultLanPort (45454)
+          final client = HttpClient()..connectionTimeout = const Duration(milliseconds: 400);
+          final futures = <Future<void>>[];
+
+          for (int i = 1; i < 255; i++) {
+            final targetIp = '$subnetPrefix.$i';
+            if (targetIp == addr.address) continue; // Skip self IP
+
+            futures.add(() async {
+              try {
+                final req = await client.getUrl(
+                  Uri.parse('http://$targetIp:$defaultLanPort${PoolApiRoutes.ping}'),
+                );
+                final res = await req.close();
+                if (res.statusCode == 200) {
+                  final bodyStr = await res.transform(utf8.decoder).join();
+                  final json = jsonDecode(bodyStr) as Map<String, dynamic>;
+                  final node = DeviceNode.fromJson(json);
+                  if (node.id != localNode.id) {
+                    _addOrUpdatePeer(
+                      DiscoveredPeer(
+                        id: node.id,
+                        name: node.name,
+                        platformType: node.platformType,
+                        ip: targetIp,
+                        port: node.port,
+                        lastSeen: DateTime.now(),
+                      ),
+                    );
+                  }
+                }
+              } catch (_) {}
+            }());
+
+            if (futures.length >= 40) {
+              await Future.wait(futures);
+              futures.clear();
+            }
+          }
+
+          if (futures.isNotEmpty) {
+            await Future.wait(futures);
+          }
+          client.close();
+        }
+      }
+    } catch (_) {}
+  }
+
   void _addOrUpdatePeer(DiscoveredPeer peer) {
     _peers[peer.id] = peer;
     _peersController.add(currentPeers);
@@ -195,9 +206,8 @@ class PoolDiscoveryService {
   Future<void> stop() async {
     _peerPruneTimer?.cancel();
     _udpBeaconTimer?.cancel();
+    _subnetSweepTimer?.cancel();
     _udpSocket?.close();
-    await _discovery?.stop();
-    await _broadcast?.stop();
     _peersController.close();
   }
 }
