@@ -160,7 +160,7 @@ class PoolDiscoveryService {
             futures.add(() async {
               try {
                 final req = await client.getUrl(
-                  Uri.parse('http://$targetIp:$defaultLanPort${PoolApiRoutes.ping}'),
+                  Uri.parse('http://$targetIp:$defaultLanPort/api/ping'),
                 );
                 final res = await req.close();
                 if (res.statusCode == 200) {
