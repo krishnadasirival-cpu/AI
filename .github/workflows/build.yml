@@ -30,56 +30,76 @@ jobs:
       - name: Configure Android SDK & Subprojects to compileSdk 34
         run: |
           python3 -c "
-          # 1. Update android/app/build.gradle
-          app_gradle = 'android/app/build.gradle'
-          with open(app_gradle, 'r', encoding='utf-8') as f:
-              c = f.read()
-          c = c.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 34')
-          with open(app_gradle, 'w', encoding='utf-8') as f:
-              f.write(c)
+          import os
 
-          # 2. Force all subprojects (including bonsoir_android) to compileSdk 34
-          root_gradle = 'android/build.gradle'
-          override = '''
-          subprojects {
-              afterEvaluate { project ->
-                  if (project.hasProperty('android')) {
-                      project.android {
-                          compileSdkVersion 34
+          # 1. Update android/app/build.gradle.kts or build.gradle
+          for p in ['android/app/build.gradle.kts', 'android/app/build.gradle']:
+              if os.path.exists(p):
+                  with open(p, 'r', encoding='utf-8') as f:
+                      c = f.read()
+                  c = c.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 34')
+                  c = c.replace('compileSdkVersion flutter.compileSdkVersion', 'compileSdkVersion 34')
+                  with open(p, 'w', encoding='utf-8') as f:
+                      f.write(c)
+                  print('Updated:', p)
+
+          # 2. Append subprojects override to android/build.gradle.kts or build.gradle
+          for p in ['android/build.gradle.kts', 'android/build.gradle']:
+              if os.path.exists(p):
+                  if p.endswith('.kts'):
+                      override = '''
+                      subprojects {
+                          afterEvaluate {
+                              if (project.hasProperty(\"android\")) {
+                                  val android = project.extensions.findByName(\"android\") as? com.android.build.gradle.BaseExtension
+                                  android?.compileSdkVersion(34)
+                              }
+                          }
                       }
-                  }
-              }
-          }
-          '''
-          with open(root_gradle, 'a', encoding='utf-8') as f:
-              f.write('\n' + override + '\n')
+                      '''
+                  else:
+                      override = '''
+                      subprojects {
+                          afterEvaluate { project ->
+                              if (project.hasProperty('android')) {
+                                  project.android {
+                                      compileSdkVersion 34
+                                  }
+                              }
+                          }
+                      }
+                      '''
+                  with open(p, 'a', encoding='utf-8') as f:
+                      f.write('\n' + override + '\n')
+                  print('Added override to:', p)
 
           # 3. Inject Android Permissions & Leanback into Manifest
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
-          with open(manifest_path, 'r', encoding='utf-8') as f:
-              content = f.read()
+          if os.path.exists(manifest_path):
+              with open(manifest_path, 'r', encoding='utf-8') as f:
+                  content = f.read()
 
-          permissions = '''
-              <uses-permission android:name=\"android.permission.INTERNET\" />
-              <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />
-              <uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\" />
-              <uses-permission android:name=\"android.permission.CHANGE_WIFI_MULTICAST_STATE\" />
-              <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />
-              <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />
-              <uses-permission android:name=\"android.permission.MANAGE_EXTERNAL_STORAGE\" />
-              <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />
-              <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_DATA_SYNC\" />
-              <uses-permission android:name=\"android.permission.WAKE_LOCK\" />
-              <uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\" />
-              <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />
-              <uses-feature android:name=\"android.software.leanback\" android:required=\"false\" />
-              <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />
-              <uses-feature android:name=\"android.hardware.wifi\" android:required=\"false\" />
-          '''
-          content = content.replace('<application', permissions + '\n    <application')
-          with open(manifest_path, 'w', encoding='utf-8') as f:
-              f.write(content)
-          print('Android SDK 34 and permissions configured successfully.')
+              permissions = '''
+                  <uses-permission android:name=\"android.permission.INTERNET\" />
+                  <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />
+                  <uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\" />
+                  <uses-permission android:name=\"android.permission.CHANGE_WIFI_MULTICAST_STATE\" />
+                  <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />
+                  <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />
+                  <uses-permission android:name=\"android.permission.MANAGE_EXTERNAL_STORAGE\" />
+                  <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />
+                  <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_DATA_SYNC\" />
+                  <uses-permission android:name=\"android.permission.WAKE_LOCK\" />
+                  <uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\" />
+                  <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />
+                  <uses-feature android:name=\"android.software.leanback\" android:required=\"false\" />
+                  <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />
+                  <uses-feature android:name=\"android.hardware.wifi\" android:required=\"false\" />
+              '''
+              content = content.replace('<application', permissions + '\n    <application')
+              with open(manifest_path, 'w', encoding='utf-8') as f:
+                  f.write(content)
+              print('Manifest configured.')
           "
 
       - name: Install Dependencies
