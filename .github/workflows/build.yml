@@ -24,6 +24,9 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Recreate Android Platform Files
+        run: flutter create . --platforms=android --org=com.example
+
       - name: Install Dependencies
         run: flutter pub get
 
@@ -51,6 +54,9 @@ jobs:
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
+      - name: Recreate Windows Platform Files
+        run: flutter create . --platforms=windows --org=com.example
+
       - name: Install Dependencies
         run: flutter pub get
 
@@ -61,4 +67,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: p2p-file-pool-windows
-          path: build/windows/x64/runner/Release/\n
+          path: build/windows/x64/runner/Release/
