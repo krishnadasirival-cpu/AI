@@ -21,7 +21,7 @@ class ExpressiveTheme {
       colorScheme: scheme,
       textTheme: textTheme,
       scaffoldBackgroundColor: const Color(0xFF121316),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: const Color(0xFF1C1B1F),
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -38,7 +38,7 @@ class ExpressiveTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: const Color(0xFF1E1F24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
