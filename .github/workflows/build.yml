@@ -43,13 +43,36 @@ jobs:
                   c = c.replace('compileSdkVersion flutter.compileSdkVersion', 'compileSdkVersion 36')
                   c = c.replace('compileSdkVersion 35', 'compileSdkVersion 36')
                   c = c.replace('compileSdkVersion 34', 'compileSdkVersion 36')
-                  # disable checkAarMetadata
-                  c += '\ntasks.whenTaskAdded { if (name.contains(\"checkAarMetadata\", ignoreCase = true)) { enabled = false } }\n'
                   with open(p, 'w', encoding='utf-8') as f:
                       f.write(c)
                   print('Updated:', p)
 
-          # 2. Inject Android Permissions & Leanback into Manifest
+          # 2. Append gradle init script to force all projects (including plugins) to compileSdk 36 and disable checkAarMetadata
+          os.makedirs(os.path.expanduser('~/.gradle/init.d'), exist_ok=True)
+          init_script = '''
+          allprojects {
+              tasks.whenTaskAdded { task ->
+                  if (task.name.contains('checkAarMetadata', true)) {
+                      task.enabled = false
+                  }
+              }
+              plugins.withId('com.android.application') {
+                  project.android {
+                      compileSdkVersion 36
+                  }
+              }
+              plugins.withId('com.android.library') {
+                  project.android {
+                      compileSdkVersion 36
+                  }
+              }
+          }
+          '''
+          with open(os.path.expanduser('~/.gradle/init.d/overrides.gradle'), 'w', encoding='utf-8') as f:
+              f.write(init_script)
+          print('Gradle init script installed at ~/.gradle/init.d/overrides.gradle')
+
+          # 3. Inject Android Permissions & Leanback into Manifest
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           if os.path.exists(manifest_path):
               with open(manifest_path, 'r', encoding='utf-8') as f:
